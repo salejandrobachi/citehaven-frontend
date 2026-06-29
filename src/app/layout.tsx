@@ -1,33 +1,39 @@
-import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
-import "./globals.css";
-import { ApolloProviderWrapper } from "@/components/ApolloProviderWrapper";
+import type { Metadata } from 'next'
+import { Geist, Geist_Mono } from 'next/font/google'
+import { NextIntlClientProvider } from 'next-intl'
+import { getMessages } from 'next-intl/server'
+import './globals.css'
+import { ApolloProviderWrapper } from '@/components/ApolloProviderWrapper'
 
 const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
+  variable: '--font-geist-sans',
+  subsets: ['latin'],
+})
 
 const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
+  variable: '--font-geist-mono',
+  subsets: ['latin'],
+})
 
 export const metadata: Metadata = {
-  title: "CiteHaven",
-  description: "Organiza tus citas academicas con estilo y comodidad",
-};
+  title: 'CiteHaven',
+  description: 'Organiza tus citas academicas con estilo y comodidad',
+}
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
-  children: React.ReactNode;
+  children: React.ReactNode
 }>) {
+  const messages = await getMessages()
+
   return (
     <html lang="es" className={`${geistSans.variable} ${geistMono.variable}`}>
       <body>
-        <ApolloProviderWrapper>{children}</ApolloProviderWrapper>
+        <NextIntlClientProvider messages={messages}>
+          <ApolloProviderWrapper>{children}</ApolloProviderWrapper>
+        </NextIntlClientProvider>
       </body>
     </html>
-  );
+  )
 }
