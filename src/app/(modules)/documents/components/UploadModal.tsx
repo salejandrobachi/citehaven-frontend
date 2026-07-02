@@ -15,8 +15,7 @@ import {
   type ProcessedDocument,
 } from '../graphql/mutations'
 
-// TODO: Replace with dynamic vault ID when vault management is implemented
-const VAULT_ID = '8ae1e229-603c-451d-b454-16b9edddd2bb'
+const VAULT_ID_KEY = 'citehaven-vault-id'
 
 interface UploadApiResponse {
   storageUrl: string
@@ -77,6 +76,12 @@ export function UploadModal({ open, onClose, onSuccess }: UploadModalProps) {
       return
     }
 
+    const vaultId = localStorage.getItem(VAULT_ID_KEY)
+    if (!vaultId) {
+      setUploadError(t('uploadModalErrorNoVaultSelected'))
+      return
+    }
+
     setIsLoading(true)
     setUploadError(null)
 
@@ -102,8 +107,7 @@ export function UploadModal({ open, onClose, onSuccess }: UploadModalProps) {
       // Step 2: Register the document in the database
       const createRes = await createDocument({
         variables: {
-          // TODO: Replace with dynamic vault ID when vault management is implemented
-          vaultId: VAULT_ID,
+          vaultId,
           filename: uploadData.filename,
           fileType: uploadData.fileType,
           storageUrl: uploadData.storageUrl,

@@ -1,5 +1,39 @@
 import { gql } from '@apollo/client'
 
+export const DOCUMENTS_QUERY = gql`
+  query Documents($where: DocumentFilter) {
+    documents(where: $where) {
+      id
+      filename
+      fileType
+      status
+      createdAt
+      storageUrl
+    }
+  }
+`
+
+export interface Document {
+  id: string
+  filename: string
+  fileType: string
+  status: string
+  createdAt: string
+  storageUrl: string
+}
+
+export interface DocumentsData {
+  documents: Document[]
+}
+
+export interface DocumentFilter {
+  vaultId?: string
+}
+
+export interface DocumentsVariables {
+  where?: DocumentFilter
+}
+
 export const CREATE_DOCUMENT = gql`
   mutation CreateDocument(
     $vaultId: ID!

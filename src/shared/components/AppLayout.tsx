@@ -1,11 +1,18 @@
 'use client'
 
-import { useState } from 'react'
-import { FileTextOutlined, MoonOutlined, SunOutlined, UserOutlined } from '@ant-design/icons'
-import { Avatar, Button, ConfigProvider, Dropdown, Layout, Menu, theme, Tooltip } from 'antd'
+import { useRef, useState } from 'react'
+import {
+  AppstoreOutlined,
+  CameraOutlined,
+  LogoutOutlined,
+  MoonOutlined,
+  SunOutlined,
+} from '@ant-design/icons'
+import { Avatar, Button, ConfigProvider, Dropdown, Layout, Menu, message, theme, Tooltip } from 'antd'
 import type { GlobalToken } from 'antd'
 import { useLocale, useTranslations } from 'next-intl'
-import { useRouter } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
+import { clearAuth, getAuth } from '@/lib/auth'
 import { darkThemeConfig, lightThemeConfig } from '@/shared/theme/tokens'
 import { CiteHavenLogo } from './CiteHavenLogo'
 
@@ -97,6 +104,9 @@ interface AppLayoutProps {
   children: React.ReactNode
 }
 
+const VAULT_TITLE_KEY = 'citehaven-vault-title'
+const AVATAR_KEY = 'citehaven-avatar'
+
 interface LayoutInnerProps {
   children: React.ReactNode
   isDark: boolean
@@ -108,10 +118,71 @@ function LayoutInner({ children, isDark, onToggleTheme }: LayoutInnerProps) {
   const t = useTranslations()
   const locale = useLocale()
   const router = useRouter()
+  const pathname = usePathname()
+  const [vaultTitle] = useState<string | null>(() => {
+    if (typeof window === 'undefined') return null
+    return localStorage.getItem(VAULT_TITLE_KEY)
+  })
+
+  const authData = getAuth()
+  const initial = (authData?.email?.[0] ?? '?').toUpperCase()
+  const [avatarSrc, setAvatarSrc] = useState<string | null>(() => {
+    if (typeof window === 'undefined') return null
+    return localStorage.getItem(AVATAR_KEY)
+  })
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const handleAvatarFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+
+    const ALLOWED = ['image/jpeg', 'image/png', 'image/webp']
+    if (!ALLOWED.includes(file.type)) {
+      void message.error(t('avatarErrorFileType'))
+      return
+    }
+    if (file.size > 1024 * 1024) {
+      void message.error(t('avatarErrorFileSize'))
+      return
+    }
+
+    const auth = getAuth()
+    if (!auth) return
+
+    const formData = new FormData()
+    formData.append('avatar', file)
+
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? ''
+      const res = await fetch(`${apiUrl}user/avatar`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${auth.token}` },
+        body: formData,
+      })
+
+      if (!res.ok) {
+        const text = await res.text()
+        void message.error(text || t('avatarErrorUpload'))
+        return
+      }
+
+      const { avatarUrl } = (await res.json()) as { avatarUrl: string }
+      localStorage.setItem(AVATAR_KEY, avatarUrl)
+      setAvatarSrc(avatarUrl)
+    } catch {
+      void message.error(t('avatarErrorUpload'))
+    }
+  }
 
   const handleLocaleChange = (newLocale: string) => {
     setLocaleCookie(newLocale)
     router.refresh()
+  }
+
+  const handleLogout = () => {
+    clearAuth()
+    router.push('/login')
   }
 
   return (
@@ -135,9 +206,30 @@ function LayoutInner({ children, isDark, onToggleTheme }: LayoutInnerProps) {
                   borderRadius: token.borderRadius,
                   boxShadow: token.boxShadowSecondary,
                   padding: '4px 0',
-                  minWidth: 150,
+                  minWidth: 180,
                 }}
               >
+                <div
+                  onClick={() => fileInputRef.current?.click()}
+                  style={{
+                    padding: '6px 16px',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    color: token.colorText,
+                    fontSize: token.fontSize,
+                  }}
+                  onMouseEnter={(e) => {
+                    ;(e.currentTarget as HTMLDivElement).style.background = token.colorBgTextHover
+                  }}
+                  onMouseLeave={(e) => {
+                    ;(e.currentTarget as HTMLDivElement).style.background = 'transparent'
+                  }}
+                >
+                  <CameraOutlined />
+                  <span>{t('menuChangePhoto')}</span>
+                </div>
                 <LanguageItem
                   locale={locale}
                   token={token}
@@ -146,22 +238,64 @@ function LayoutInner({ children, isDark, onToggleTheme }: LayoutInnerProps) {
                   langEn={t('langEn')}
                   onSelect={handleLocaleChange}
                 />
+                <div
+                  onClick={handleLogout}
+                  style={{
+                    padding: '6px 16px',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    color: token.colorError,
+                    fontSize: token.fontSize,
+                  }}
+                  onMouseEnter={(e) => {
+                    ;(e.currentTarget as HTMLDivElement).style.background = token.colorBgTextHover
+                  }}
+                  onMouseLeave={(e) => {
+                    ;(e.currentTarget as HTMLDivElement).style.background = 'transparent'
+                  }}
+                >
+                  <LogoutOutlined />
+                  <span>{t('menuLogout')}</span>
+                </div>
               </div>
             )}
           >
-            <Avatar size={40} icon={<UserOutlined />} style={{ cursor: 'pointer' }} />
+            <Avatar
+              size={40}
+              src={avatarSrc ?? undefined}
+              style={{
+                cursor: 'pointer',
+                background: avatarSrc ? undefined : token.colorPrimary,
+                fontSize: 16,
+                fontWeight: 600,
+                userSelect: 'none',
+              }}
+            >
+              {!avatarSrc && initial}
+            </Avatar>
           </Dropdown>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            style={{ display: 'none' }}
+            onChange={handleAvatarFile}
+          />
         </div>
         <Menu
           theme="dark"
-          defaultSelectedKeys={['documents']}
+          selectedKeys={[pathname.includes('/vaults') ? 'vaults' : '']}
           mode="inline"
+          onClick={({ key }) => {
+            if (key === 'vaults') router.push('/vaults')
+          }}
           items={[
             {
-              key: 'documents',
-              icon: <FileTextOutlined />,
-              label: t('navDocuments'),
-              title: '',
+              key: 'vaults',
+              icon: <AppstoreOutlined />,
+              label: t('navVaults'),
             },
           ]}
         />
@@ -185,14 +319,21 @@ function LayoutInner({ children, isDark, onToggleTheme }: LayoutInnerProps) {
             </span>
           </div>
 
-          <Tooltip title={isDark ? t('themeSwitchToLight') : t('themeSwitchToDark')}>
-            <Button
-              type="text"
-              icon={isDark ? <SunOutlined /> : <MoonOutlined />}
-              onClick={onToggleTheme}
-              aria-label={isDark ? t('themeSwitchToLight') : t('themeSwitchToDark')}
-            />
-          </Tooltip>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            {vaultTitle && (
+              <span style={{ fontSize: 13, color: token.colorTextSecondary }}>
+                {vaultTitle}
+              </span>
+            )}
+            <Tooltip title={isDark ? t('themeSwitchToLight') : t('themeSwitchToDark')}>
+              <Button
+                type="text"
+                icon={isDark ? <SunOutlined /> : <MoonOutlined />}
+                onClick={onToggleTheme}
+                aria-label={isDark ? t('themeSwitchToLight') : t('themeSwitchToDark')}
+              />
+            </Tooltip>
+          </div>
         </Header>
 
         <Content
